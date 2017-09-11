@@ -11,6 +11,8 @@ CONFIG_TEMPLATE = """
 
 from fabric_bolt.core.settings.base import *
 
+DEBUG = True
+
 CONF_ROOT = os.path.dirname(__file__)
 
 # See https://docs.djangoproject.com/en/1.8/ref/settings/#s-allowed-hosts
