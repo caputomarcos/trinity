@@ -1,6 +1,9 @@
 import cgi
 import datetime
 import time
+
+import hashlib
+
 from tempfile import NamedTemporaryFile
 
 from fabric.api import *
@@ -21,6 +24,32 @@ def update():
 def git_pull():
     """Does a git stash then a git pull on the project"""
     run('cd %s; git stash; git pull' % (env.code_root))
+
+
+@task
+def git_clone():
+    """Does a git stash then a git pull on the project"""
+    folder_name = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+
+
+    # backup old deploy
+    run(
+        "tar -cvzf {code_root}/releases/$(ls -la {code_root}/current | sed 's#.*/##').tar.gz -P $(readlink -f {code_root}/current);"
+        "git clone -q -b master {branch} {code_root}/releases/{folder_name};"
+        "cd {code_root}/releases/{folder_name} && git checkout -q -b deploy $(git rev-parse HEAD);"
+        "git ls-remote {branch} master | cut -c1-40 > {code_root}/releases/{folder_name}/REVISION;"
+        "rm -rf $(readlink -f {code_root}/current) && rm {code_root}/current;"
+        "ln -s {code_root}/releases/{folder_name} {code_root}/current;".format(branch=env.branch,
+                                                                              code_root=env.code_root,
+                                                                              folder_name=folder_name))
+    custom_shared_children()
+
+@task
+def custom_shared_children():
+    """Create settings linked files"""
+    childrens = env.custom_shared_children.split(';')
+    for children in childrens:
+        run("ln -s {code_root}/shared/{children} {code_root}/current;".format(code_root=env.code_root, children=children))
 
 
 @task
@@ -118,6 +147,7 @@ def color_test():
         time.sleep(0.2)
         print
 
+
 @task
 def test_env(argument="nothing"):
     print("Task Arguments:")
@@ -135,12 +165,14 @@ def update_sandbox_site(comment_text):
 
     file_to_deliver = NamedTemporaryFile(delete=False)
 
-    file_text = "Deployed at: {} <br /> Comment: {}".format(datetime.datetime.now().strftime('%c'), cgi.escape(comment_text))
+    file_text = "Deployed at: {} <br /> Comment: {}".format(datetime.datetime.now().strftime('%c'),
+                                                            cgi.escape(comment_text))
 
     file_to_deliver.write(file_text)
     file_to_deliver.close()
 
     put(file_to_deliver.name, '/var/www/html/index.html', use_sudo=True)
+
 
 @task
 def list():
